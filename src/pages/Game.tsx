@@ -167,6 +167,14 @@ export default function Game() {
     fetchAll();
   };
 
+  const deleteAtBat = async (ab: AtBat) => {
+    const player = players.find(p => p.id === ab.player_id);
+    const { label } = RESULT_LABELS[ab.result] ?? { label: ab.result };
+    if (!confirm(`Delete ${label} for ${player?.name ?? 'this player'} in inning ${ab.inning}?`)) return;
+    await supabase.from('at_bats').delete().eq('id', ab.id);
+    fetchAll();
+  };
+
   const addPitcher = async (playerId: string) => {
     const existing = pitchCounts.find(p => p.player_id === playerId);
     if (!existing) {
@@ -369,12 +377,20 @@ export default function Game() {
                       {ab.stolen_base && <span className="text-xs text-sky-300">SB</span>}
                       <span className="text-xs text-slate-500">Inn. {ab.inning}</span>
                     </div>
-                    <button
-                      onClick={() => openEditAtBatForm(ab)}
-                      className="text-slate-500 hover:text-amber-400 text-xs px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors ml-1 flex-shrink-0"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex items-center gap-1 ml-1 flex-shrink-0">
+                      <button
+                        onClick={() => openEditAtBatForm(ab)}
+                        className="text-slate-500 hover:text-amber-400 text-xs px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteAtBat(ab)}
+                        className="text-slate-600 hover:text-red-400 text-lg px-1 transition-colors"
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
                 );
               })}
