@@ -172,6 +172,8 @@ export default function Game() {
     const { label } = RESULT_LABELS[ab.result] ?? { label: ab.result };
     if (!confirm(`Delete ${label} for ${player?.name ?? 'this player'} in inning ${ab.inning}?`)) return;
     await supabase.from('at_bats').delete().eq('id', ab.id);
+    setShowAtBatForm(false);
+    setEditingAtBat(null);
     fetchAll();
   };
 
@@ -308,7 +310,7 @@ export default function Game() {
                 <div className="mb-3">
                   <span className="text-sm text-sky-300 block mb-2">Inning:</span>
                   <div className="flex flex-wrap gap-2">
-                    {[1,2,3,4,5,6,7,8,9].map(i => (
+                    {[1,2,3,4,5,6].map(i => (
                       <button
                         key={i}
                         onClick={() => setInning(i)}
@@ -360,6 +362,14 @@ export default function Game() {
                   <button onClick={saveAtBat} disabled={!selectedPlayer || !result} className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white py-2 rounded-xl text-sm font-medium transition-colors">Save</button>
                   <button onClick={() => { setShowAtBatForm(false); setEditingAtBat(null); }} className="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl text-sm font-medium transition-colors">Cancel</button>
                 </div>
+                {editingAtBat && (
+                  <button
+                    onClick={() => deleteAtBat(editingAtBat)}
+                    className="w-full mt-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 py-2 rounded-xl text-sm transition-colors"
+                  >
+                    Delete At-Bat
+                  </button>
+                )}
               </div>
             )}
 
@@ -377,20 +387,12 @@ export default function Game() {
                       {ab.stolen_base && <span className="text-xs text-sky-300">SB</span>}
                       <span className="text-xs text-slate-500">Inn. {ab.inning}</span>
                     </div>
-                    <div className="flex items-center gap-1 ml-1 flex-shrink-0">
-                      <button
-                        onClick={() => openEditAtBatForm(ab)}
-                        className="text-slate-500 hover:text-amber-400 text-xs px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => deleteAtBat(ab)}
-                        className="text-slate-600 hover:text-red-400 text-lg px-1 transition-colors"
-                      >
-                        ×
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => openEditAtBatForm(ab)}
+                      className="text-slate-500 hover:text-amber-400 text-xs px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors ml-1 flex-shrink-0"
+                    >
+                      Edit
+                    </button>
                   </div>
                 );
               })}
