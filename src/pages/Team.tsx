@@ -57,7 +57,8 @@ export default function Team() {
     if (data) navigate(`/game/${data.id}`);
   };
 
-  const deletePlayer = async (playerId: string) => {
+  const deletePlayer = async (playerId: string, name: string) => {
+    if (!confirm(`Remove ${name} from the roster? This cannot be undone.`)) return;
     await supabase.from('players').delete().eq('id', playerId);
     fetchAll();
   };
@@ -136,7 +137,7 @@ export default function Team() {
                     )}
                     <span className="font-medium">{player.name}</span>
                   </div>
-                  <button onClick={() => deletePlayer(player.id)} className="text-slate-600 hover:text-red-400 text-lg transition-colors">×</button>
+                  <button onClick={() => deletePlayer(player.id, player.name)} className="text-slate-600 hover:text-red-400 text-lg transition-colors">×</button>
                 </div>
               ))}
             </div>
