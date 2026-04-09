@@ -61,6 +61,12 @@ export default function Team() {
     fetchAll();
   };
 
+  const deleteGame = async (gameId: string, opponent: string) => {
+    if (!confirm(`Delete game vs. ${opponent}? This cannot be undone.`)) return;
+    await supabase.from('games').delete().eq('id', gameId);
+    fetchAll();
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4">
       <div className="max-w-lg mx-auto">
@@ -169,22 +175,29 @@ export default function Team() {
 
             <div className="space-y-2">
               {games.map(game => (
-                <Link
-                  key={game.id}
-                  to={`/game/${game.id}`}
-                  className="block bg-slate-900 hover:bg-slate-800 border border-blue-900 rounded-2xl px-4 py-3 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">vs. {game.opponent}</p>
-                      <p className="text-sm text-sky-300">{new Date(game.game_date).toLocaleDateString()}</p>
+                <div key={game.id} className="flex items-center gap-2">
+                  <Link
+                    to={`/game/${game.id}`}
+                    className="flex-1 block bg-slate-900 hover:bg-slate-800 border border-blue-900 rounded-2xl px-4 py-3 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">vs. {game.opponent}</p>
+                        <p className="text-sm text-sky-300">{new Date(game.game_date).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-lg text-amber-400">{game.home_score} – {game.away_score}</p>
+                        <span className="text-sky-300 text-sm">›</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg text-amber-400">{game.home_score} – {game.away_score}</p>
-                      <span className="text-sky-300 text-sm">›</span>
-                    </div>
-                  </div>
-                </Link>
+                  </Link>
+                  <button
+                    onClick={() => deleteGame(game.id, game.opponent)}
+                    className="text-slate-600 hover:text-red-400 text-xl px-2 transition-colors"
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
           </>
