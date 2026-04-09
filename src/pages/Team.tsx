@@ -108,10 +108,16 @@ export default function Team() {
       <div className="max-w-lg mx-auto">
         <div className="flex items-center gap-3 mb-6 pt-4">
           <Link to="/" className="text-sky-300 hover:text-white text-2xl">‹</Link>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold">{team?.name}</h1>
             <p className="text-sky-300 text-sm">{team?.season} Season</p>
           </div>
+          <Link
+            to={`/team/${teamId}/stats`}
+            className="bg-blue-800 hover:bg-blue-700 px-3 py-2 rounded-xl text-xs font-medium transition-colors"
+          >
+            📊 Season Stats
+          </Link>
         </div>
 
         {/* Tabs */}
