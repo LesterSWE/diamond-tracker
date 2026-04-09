@@ -42,7 +42,7 @@ export default function Team() {
   const fetchAll = async () => {
     const [teamRes, playersRes, gamesRes] = await Promise.all([
       supabase.from('teams').select('*').eq('id', teamId).single(),
-      supabase.from('players').select('*').eq('team_id', teamId).order('jersey_number'),
+      supabase.from('players').select('*').eq('team_id', teamId).order('name'),
       supabase.from('games').select('*').eq('team_id', teamId).order('game_date', { ascending: false }),
     ]);
     setTeam(teamRes.data);

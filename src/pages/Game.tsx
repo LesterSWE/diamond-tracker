@@ -90,7 +90,7 @@ export default function Game() {
         .from('players')
         .select('*')
         .eq('team_id', gameData.team_id)
-        .order('jersey_number');
+        .order('name');
       setPlayers(teamPlayers ?? []);
 
       // Fetch previous pitch data for rest day eligibility
@@ -534,7 +534,12 @@ export default function Game() {
               <tbody>
                 {playerStats.map(({ player, abs, hits, runs, rbis, walks, ks, sbs, avg }) => (
                   <tr key={player.id} className="border-b border-slate-900">
-                    <td className="py-2 pr-3 font-medium">{player.name}</td>
+                    <td className="py-2 pr-3 font-medium">
+                      <span>{player.name}</span>
+                      {player.jersey_number !== null && (
+                        <span className="text-xs text-amber-400 ml-1">#{player.jersey_number}</span>
+                      )}
+                    </td>
                     <td className="text-center py-2 px-1 text-slate-300">{abs}</td>
                     <td className="text-center py-2 px-1 text-green-400 font-medium">{hits}</td>
                     <td className="text-center py-2 px-1 text-slate-300">{runs}</td>
