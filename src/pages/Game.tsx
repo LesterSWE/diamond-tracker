@@ -297,17 +297,19 @@ export default function Game() {
                   ))}
                 </select>
 
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-sm text-sky-300">Inning:</span>
-                  {[1,2,3,4,5,6].map(i => (
-                    <button
-                      key={i}
-                      onClick={() => setInning(i)}
-                      className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${inning === i ? 'bg-blue-800 text-amber-400 font-bold' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-                    >
-                      {i}
-                    </button>
-                  ))}
+                <div className="mb-3">
+                  <span className="text-sm text-sky-300 block mb-2">Inning:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {[1,2,3,4,5,6,7,8,9].map(i => (
+                      <button
+                        key={i}
+                        onClick={() => setInning(i)}
+                        className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${inning === i ? 'bg-blue-800 text-amber-400 font-bold' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                      >
+                        {i}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-4 gap-2 mb-3">
