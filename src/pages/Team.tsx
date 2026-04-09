@@ -234,12 +234,15 @@ export default function Team() {
                   onChange={e => setOpponent(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-700"
                 />
-                <input
-                  type="date"
-                  value={gameDate}
-                  onChange={e => setGameDate(e.target.value)}
-                  className="w-full max-w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                />
+                <div className="w-full overflow-hidden mb-4">
+                  <input
+                    type="date"
+                    value={gameDate}
+                    onChange={e => setGameDate(e.target.value)}
+                    className="w-full min-w-0 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-700 box-border"
+                    style={{ maxWidth: '100%' }}
+                  />
+                </div>
                 <div className="flex gap-2">
                   <button onClick={addGame} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-xl text-sm font-medium transition-colors">Start Game</button>
                   <button onClick={() => setShowGameForm(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl text-sm font-medium transition-colors">Cancel</button>
