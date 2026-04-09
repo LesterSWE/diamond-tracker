@@ -262,26 +262,42 @@ export default function Game() {
         {/* PITCHING TAB */}
         {tab === 'pitching' && (
           <div className="space-y-3">
-            <p className="text-xs text-slate-500 mb-2">Youth pitch limit: 50 pitches/day (ages 7-8)</p>
+            <div className="bg-slate-900 border border-blue-900 rounded-xl px-4 py-3 text-xs text-sky-300 space-y-1">
+              <p className="font-semibold text-white mb-1">Ages 7–8 Rules</p>
+              <p>⚾ Max 50 pitches/game · Max 1 inning/game (2 in playoffs)</p>
+              <p>😴 Rest: 21–35 pitches = 1 day · 36–50 = 2 days · 51–65 = 3 days · 66+ = 4 days</p>
+              <p>🚫 No pitching back-to-back games</p>
+            </div>
+
             {players.map(player => {
               const pc = pitchCounts.find(p => p.player_id === player.id);
               const count = pc?.count ?? 0;
               const pct = Math.min((count / 50) * 100, 100);
               const barColor = count >= 45 ? 'bg-red-500' : count >= 35 ? 'bg-amber-500' : 'bg-sky-400';
+              const restDays = count >= 66 ? 4 : count >= 51 ? 3 : count >= 36 ? 2 : count >= 21 ? 1 : 0;
+              const restLabel = restDays > 0 ? `${restDays} day${restDays > 1 ? 's' : ''} rest required` : 'No rest required';
+              const restColor = restDays >= 3 ? 'text-red-400' : restDays === 2 ? 'text-amber-400' : restDays === 1 ? 'text-yellow-300' : 'text-green-400';
               return (
                 <div key={player.id} className="bg-slate-900 border border-blue-900 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium">{player.name}</span>
                     <span className={`text-2xl font-bold ${count >= 45 ? 'text-red-400' : count >= 35 ? 'text-amber-400' : 'text-white'}`}>{count}</span>
                   </div>
-                  <div className="w-full bg-slate-800 rounded-full h-2 mb-3">
+                  <div className="w-full bg-slate-800 rounded-full h-2 mb-2">
                     <div className={`${barColor} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`text-xs font-medium ${restColor}`}>
+                      {count > 0 ? `😴 ${restLabel}` : '—'}
+                    </span>
+                    <span className="text-xs text-slate-500">{50 - count > 0 ? `${50 - count} left` : 'Limit reached'}</span>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => removePitch(player.id)} className="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl text-sm font-medium transition-colors">− 1</button>
-                    <button onClick={() => addPitch(player.id)} className="flex-1 bg-blue-800 hover:bg-blue-700 py-2 rounded-xl text-sm font-bold transition-colors">+ 1 Pitch</button>
+                    <button onClick={() => addPitch(player.id)} disabled={count >= 50} className="flex-1 bg-blue-800 hover:bg-blue-700 disabled:opacity-40 py-2 rounded-xl text-sm font-bold transition-colors">+ 1 Pitch</button>
                   </div>
-                  {count >= 45 && <p className="text-red-400 text-xs mt-2 text-center">⚠️ Approaching pitch limit!</p>}
+                  {count >= 50 && <p className="text-red-400 text-xs mt-2 text-center font-semibold">🛑 Pitch limit reached!</p>}
+                  {count >= 45 && count < 50 && <p className="text-amber-400 text-xs mt-2 text-center">⚠️ Approaching limit — {50 - count} pitch{50 - count !== 1 ? 'es' : ''} left</p>}
                 </div>
               );
             })}
