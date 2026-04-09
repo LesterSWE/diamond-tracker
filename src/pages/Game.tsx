@@ -54,8 +54,11 @@ export default function Game() {
   const [seasonAtBats, setSeasonAtBats] = useState<AtBat[]>([]);
   const [pitchCounts, setPitchCounts] = useState<PitchCount[]>([]);
   const [prevPitchInfo, setPrevPitchInfo] = useState<Record<string, PrevPitchInfo>>({});
-  const [tab, setTab] = useState<'atbats' | 'pitching' | 'score'>('atbats');
+  const [tab, setTab] = useState<'atbats' | 'pitching' | 'score' | 'recap'>('atbats');
   const [statsView, setStatsView] = useState<'game' | 'season'>('game');
+  const [recap, setRecap] = useState('');
+  const [recapLoading, setRecapLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // At-bat form
   const [editingAtBat, setEditingAtBat] = useState<AtBat | null>(null);
@@ -242,6 +245,56 @@ export default function Game() {
     fetchAll();
   };
 
+  const generateRecap = async () => {
+    if (!game) return;
+    setRecapLoading(true);
+    setRecap('');
+    const stats = computeStats(atBats);
+    const payload = {
+      teamName: game.opponent ? 'Royals' : 'Us',
+      opponent: game.opponent,
+      gameDate: new Date(game.game_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }),
+      homeScore: game.home_score,
+      awayScore: game.away_score,
+      playerStats: stats.map(s => ({
+        name: s.player.name,
+        jersey: s.player.jersey_number,
+        hits: s.hits,
+        abs: s.abs,
+        runs: s.runs,
+        rbis: s.rbis,
+        sbs: s.sbs,
+        walks: s.walks,
+        ks: s.ks,
+      })),
+      pitcherStats: players
+        .filter(p => pitchCounts.some(pc => pc.player_id === p.id))
+        .map(p => ({
+          name: p.name,
+          jersey: p.jersey_number,
+          count: pitchCounts.find(pc => pc.player_id === p.id)?.count ?? 0,
+        })),
+    };
+    try {
+      const res = await fetch('/api/highlights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      setRecap(data.text ?? 'Could not generate recap.');
+    } catch {
+      setRecap('Error generating recap. Please try again.');
+    }
+    setRecapLoading(false);
+  };
+
+  const copyRecap = async () => {
+    await navigator.clipboard.writeText(recap);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const computeStats = (sourceAtBats: AtBat[]) => players.map(player => {
     const pAtBats = sourceAtBats.filter(ab => ab.player_id === player.id);
     const hits = pAtBats.filter(ab => ['single', 'double', 'triple', 'hr'].includes(ab.result)).length;
@@ -305,13 +358,13 @@ export default function Game() {
       <div className="max-w-lg mx-auto p-4">
         {/* Tabs */}
         <div className="flex gap-1 bg-slate-900 p-1 rounded-xl mb-4">
-          {(['atbats', 'pitching', 'score'] as const).map(t => (
+          {(['atbats', 'pitching', 'score', 'recap'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${tab === t ? 'bg-blue-800 text-white' : 'text-slate-400 hover:text-white'}`}
             >
-              {t === 'atbats' ? '🏏 At-Bats' : t === 'pitching' ? '⚾ Pitching' : '📊 Stats'}
+              {t === 'atbats' ? '🏏 At-Bats' : t === 'pitching' ? '⚾ Pitching' : t === 'score' ? '📊 Stats' : '📣 Recap'}
             </button>
           ))}
         </div>
@@ -586,6 +639,35 @@ export default function Game() {
               </tbody>
             </table>
           </div>
+          </div>
+        )}
+
+        {/* RECAP TAB */}
+        {tab === 'recap' && (
+          <div>
+            <button
+              onClick={generateRecap}
+              disabled={recapLoading}
+              className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-medium mb-4 transition-colors"
+            >
+              {recapLoading ? 'Generating...' : recap ? '↺ Regenerate Recap' : '✨ Generate Game Recap'}
+            </button>
+
+            {recap && (
+              <div className="bg-slate-900 border border-blue-900 rounded-2xl p-4">
+                <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-200 mb-4">{recap}</p>
+                <button
+                  onClick={copyRecap}
+                  className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${copied ? 'bg-green-700 text-white' : 'bg-blue-800 hover:bg-blue-700 text-white'}`}
+                >
+                  {copied ? '✓ Copied!' : 'Copy to Clipboard'}
+                </button>
+              </div>
+            )}
+
+            {!recap && !recapLoading && (
+              <p className="text-slate-500 text-sm text-center py-8">Tap the button to generate a recap you can paste into your parent group chat.</p>
+            )}
           </div>
         )}
       </div>
