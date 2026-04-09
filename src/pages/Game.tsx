@@ -51,9 +51,11 @@ export default function Game() {
   const [game, setGame] = useState<GameType | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [atBats, setAtBats] = useState<AtBat[]>([]);
+  const [seasonAtBats, setSeasonAtBats] = useState<AtBat[]>([]);
   const [pitchCounts, setPitchCounts] = useState<PitchCount[]>([]);
   const [prevPitchInfo, setPrevPitchInfo] = useState<Record<string, PrevPitchInfo>>({});
   const [tab, setTab] = useState<'atbats' | 'pitching' | 'score'>('atbats');
+  const [statsView, setStatsView] = useState<'game' | 'season'>('game');
 
   // At-bat form
   const [editingAtBat, setEditingAtBat] = useState<AtBat | null>(null);
@@ -92,6 +94,20 @@ export default function Game() {
         .eq('team_id', gameData.team_id)
         .order('name');
       setPlayers(teamPlayers ?? []);
+
+      // Fetch all at-bats for the season (all games on this team)
+      const { data: allGames } = await supabase
+        .from('games')
+        .select('id')
+        .eq('team_id', gameData.team_id);
+      if (allGames && allGames.length > 0) {
+        const gameIds = allGames.map((g: { id: string }) => g.id);
+        const { data: allAtBats } = await supabase
+          .from('at_bats')
+          .select('*')
+          .in('game_id', gameIds);
+        setSeasonAtBats(allAtBats ?? []);
+      }
 
       // Fetch previous pitch data for rest day eligibility
       if (teamPlayers && gameData.game_date) {
@@ -226,8 +242,8 @@ export default function Game() {
     fetchAll();
   };
 
-  const playerStats = players.map(player => {
-    const pAtBats = atBats.filter(ab => ab.player_id === player.id);
+  const computeStats = (sourceAtBats: AtBat[]) => players.map(player => {
+    const pAtBats = sourceAtBats.filter(ab => ab.player_id === player.id);
     const hits = pAtBats.filter(ab => ['single', 'double', 'triple', 'hr'].includes(ab.result)).length;
     const abs = pAtBats.filter(ab => ab.result !== 'walk').length;
     const walks = pAtBats.filter(ab => ab.result === 'walk').length;
@@ -238,6 +254,8 @@ export default function Game() {
     const avg = abs > 0 ? (hits / abs).toFixed(3).replace('0.', '.') : '---';
     return { player, hits, abs, walks, ks, runs, rbis, sbs, avg };
   });
+
+  const playerStats = computeStats(statsView === 'game' ? atBats : seasonAtBats);
 
   // Only players with a pitch_count record for this game
   const gamePitchers = players.filter(p => pitchCounts.some(pc => pc.player_id === p.id));
@@ -516,6 +534,21 @@ export default function Game() {
 
         {/* STATS TAB */}
         {tab === 'score' && (
+          <div>
+            <div className="flex gap-1 bg-slate-900 p-1 rounded-xl mb-4">
+              <button
+                onClick={() => setStatsView('game')}
+                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${statsView === 'game' ? 'bg-blue-800 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                This Game
+              </button>
+              <button
+                onClick={() => setStatsView('season')}
+                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${statsView === 'season' ? 'bg-blue-800 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Season
+              </button>
+            </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -552,6 +585,7 @@ export default function Game() {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         )}
       </div>
