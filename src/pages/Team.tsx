@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Team as TeamType, Player, Game } from '../lib/types';
 
 export default function Team() {
   const { teamId } = useParams<{ teamId: string }>();
+  const navigate = useNavigate();
   const [team, setTeam] = useState<TeamType | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
@@ -53,7 +54,7 @@ export default function Team() {
     }).select().single();
     setOpponent('');
     setShowGameForm(false);
-    if (data) window.location.href = `/game/${data.id}`;
+    if (data) navigate(`/game/${data.id}`);
   };
 
   const deletePlayer = async (playerId: string) => {
