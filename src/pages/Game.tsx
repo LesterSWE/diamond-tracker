@@ -3,6 +3,15 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Game as GameType, Player, AtBat, PitchCount } from '../lib/types';
 
+const TrashIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+);
+
 const RESULT_LABELS: Record<string, { label: string; color: string }> = {
   single: { label: '1B', color: 'bg-green-700' },
   double: { label: '2B', color: 'bg-green-800' },
@@ -174,6 +183,13 @@ export default function Game() {
     await supabase.from('at_bats').delete().eq('id', ab.id);
     setShowAtBatForm(false);
     setEditingAtBat(null);
+    fetchAll();
+  };
+
+  const deletePitcher = async (player: Player) => {
+    if (!confirm(`Remove ${player.name} from pitching this game?`)) return;
+    const pc = pitchCounts.find(p => p.player_id === player.id);
+    if (pc) await supabase.from('pitch_counts').delete().eq('id', pc.id);
     fetchAll();
   };
 
@@ -456,7 +472,15 @@ export default function Game() {
                 <div key={player.id} className="bg-slate-900 border border-blue-900 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium">{player.name}</span>
-                    <span className={`text-2xl font-bold ${count >= 45 ? 'text-red-400' : count >= 35 ? 'text-amber-400' : 'text-white'}`}>{count}</span>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-2xl font-bold ${count >= 45 ? 'text-red-400' : count >= 35 ? 'text-amber-400' : 'text-white'}`}>{count}</span>
+                      <button
+                        onClick={() => deletePitcher(player)}
+                        className="text-slate-600 hover:text-red-400 p-1 transition-colors"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Rest eligibility from previous game */}
