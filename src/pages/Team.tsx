@@ -10,10 +10,19 @@ export default function Team() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [tab, setTab] = useState<'roster' | 'games'>('roster');
+
+  // Add player form
   const [showPlayerForm, setShowPlayerForm] = useState(false);
-  const [showGameForm, setShowGameForm] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const [jerseyNumber, setJerseyNumber] = useState('');
+
+  // Edit player
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editJersey, setEditJersey] = useState('');
+
+  // Game form
+  const [showGameForm, setShowGameForm] = useState(false);
   const [opponent, setOpponent] = useState('');
   const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -42,6 +51,22 @@ export default function Team() {
     setPlayerName('');
     setJerseyNumber('');
     setShowPlayerForm(false);
+    fetchAll();
+  };
+
+  const openEditPlayer = (player: Player) => {
+    setEditingPlayer(player);
+    setEditName(player.name);
+    setEditJersey(player.jersey_number !== null ? String(player.jersey_number) : '');
+  };
+
+  const saveEditPlayer = async () => {
+    if (!editingPlayer || !editName.trim()) return;
+    await supabase.from('players').update({
+      name: editName,
+      jersey_number: editJersey ? parseInt(editJersey) : null,
+    }).eq('id', editingPlayer.id);
+    setEditingPlayer(null);
     fetchAll();
   };
 
@@ -128,6 +153,31 @@ export default function Team() {
               </div>
             )}
 
+            {/* Edit player inline form */}
+            {editingPlayer && (
+              <div className="bg-slate-900 rounded-2xl p-4 mb-4 border border-amber-700">
+                <p className="text-sm font-medium text-amber-400 mb-3">Edit Player</p>
+                <input
+                  type="text"
+                  placeholder="Player name"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-700"
+                />
+                <input
+                  type="number"
+                  placeholder="Jersey number (optional)"
+                  value={editJersey}
+                  onChange={e => setEditJersey(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-700"
+                />
+                <div className="flex gap-2">
+                  <button onClick={saveEditPlayer} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-xl text-sm font-medium transition-colors">Save</button>
+                  <button onClick={() => setEditingPlayer(null)} className="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl text-sm font-medium transition-colors">Cancel</button>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               {players.map(player => (
                 <div key={player.id} className="bg-slate-900 border border-blue-900 rounded-2xl px-4 py-3 flex items-center justify-between">
@@ -137,7 +187,15 @@ export default function Team() {
                     )}
                     <span className="font-medium">{player.name}</span>
                   </div>
-                  <button onClick={() => deletePlayer(player.id, player.name)} className="text-slate-600 hover:text-red-400 text-lg transition-colors">×</button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openEditPlayer(player)}
+                      className="text-slate-500 hover:text-amber-400 text-xs px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button onClick={() => deletePlayer(player.id, player.name)} className="text-slate-600 hover:text-red-400 text-lg transition-colors">×</button>
+                  </div>
                 </div>
               ))}
             </div>
