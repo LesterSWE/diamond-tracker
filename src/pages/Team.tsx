@@ -3,6 +3,15 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Team as TeamType, Player, Game } from '../lib/types';
 
+const TrashIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+);
+
 export default function Team() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
@@ -194,7 +203,12 @@ export default function Team() {
                     >
                       Edit
                     </button>
-                    <button onClick={() => deletePlayer(player.id, player.name)} className="text-slate-600 hover:text-red-400 text-lg transition-colors">×</button>
+                    <button
+                      onClick={() => deletePlayer(player.id, player.name)}
+                      className="text-slate-600 hover:text-red-400 p-1 transition-colors"
+                    >
+                      <TrashIcon />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -224,7 +238,7 @@ export default function Team() {
                   type="date"
                   value={gameDate}
                   onChange={e => setGameDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-700"
+                  className="w-full max-w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-700"
                 />
                 <div className="flex gap-2">
                   <button onClick={addGame} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-xl text-sm font-medium transition-colors">Start Game</button>
@@ -238,7 +252,7 @@ export default function Team() {
                 <div key={game.id} className="flex items-center gap-2">
                   <Link
                     to={`/game/${game.id}`}
-                    className="flex-1 block bg-slate-900 hover:bg-slate-800 border border-blue-900 rounded-2xl px-4 py-3 transition-colors"
+                    className="flex-1 min-w-0 block bg-slate-900 hover:bg-slate-800 border border-blue-900 rounded-2xl px-4 py-3 transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -253,9 +267,9 @@ export default function Team() {
                   </Link>
                   <button
                     onClick={() => deleteGame(game.id, game.opponent)}
-                    className="text-slate-600 hover:text-red-400 text-xl px-2 transition-colors"
+                    className="text-slate-600 hover:text-red-400 p-2 transition-colors flex-shrink-0"
                   >
-                    ×
+                    <TrashIcon />
                   </button>
                 </div>
               ))}
