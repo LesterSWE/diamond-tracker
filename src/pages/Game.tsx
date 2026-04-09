@@ -13,14 +13,41 @@ const RESULT_LABELS: Record<string, { label: string; color: string }> = {
   out: { label: 'OUT', color: 'bg-slate-600' },
 };
 
+type ResultKey = keyof typeof RESULT_LABELS;
+
+function getRestDaysRequired(pitches: number): number {
+  if (pitches >= 66) return 4;
+  if (pitches >= 51) return 3;
+  if (pitches >= 36) return 2;
+  if (pitches >= 21) return 1;
+  return 0;
+}
+
+function daysBetween(dateA: string, dateB: string): number {
+  const a = new Date(dateA);
+  const b = new Date(dateB);
+  return Math.round(Math.abs(b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+interface PrevPitchInfo {
+  lastCount: number;
+  lastDate: string;
+  daysRequired: number;
+  daysAvailable: number;
+  eligible: boolean;
+}
+
 export default function Game() {
   const { gameId } = useParams<{ gameId: string }>();
   const [game, setGame] = useState<GameType | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [atBats, setAtBats] = useState<AtBat[]>([]);
   const [pitchCounts, setPitchCounts] = useState<PitchCount[]>([]);
+  const [prevPitchInfo, setPrevPitchInfo] = useState<Record<string, PrevPitchInfo>>({});
   const [tab, setTab] = useState<'atbats' | 'pitching' | 'score'>('atbats');
 
+  // At-bat form
+  const [editingAtBat, setEditingAtBat] = useState<AtBat | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState('');
   const [inning, setInning] = useState(1);
   const [result, setResult] = useState('');
@@ -29,42 +56,124 @@ export default function Game() {
   const [stolenBase, setStolenBase] = useState(false);
   const [showAtBatForm, setShowAtBatForm] = useState(false);
 
+  // Pitcher picker
+  const [showAddPitcher, setShowAddPitcher] = useState(false);
+
   useEffect(() => {
     fetchAll();
   }, [gameId]);
 
   const fetchAll = async () => {
     const [gameRes, atBatsRes, pitchRes] = await Promise.all([
-      supabase.from('games').select('*, teams(*)').eq('id', gameId).single(),
+      supabase.from('games').select('*').eq('id', gameId).single(),
       supabase.from('at_bats').select('*').eq('game_id', gameId).order('created_at'),
       supabase.from('pitch_counts').select('*').eq('game_id', gameId),
     ]);
-    setGame(gameRes.data);
-    if (gameRes.data?.team_id) {
-      const { data: teamPlayers } = await supabase.from('players').select('*').eq('team_id', gameRes.data.team_id).order('jersey_number');
-      setPlayers(teamPlayers ?? []);
-    }
+
+    const gameData = gameRes.data as GameType;
+    setGame(gameData);
     setAtBats(atBatsRes.data ?? []);
-    setPitchCounts(pitchRes.data ?? []);
+    const currentPitchCounts: PitchCount[] = pitchRes.data ?? [];
+    setPitchCounts(currentPitchCounts);
+
+    if (gameData?.team_id) {
+      const { data: teamPlayers } = await supabase
+        .from('players')
+        .select('*')
+        .eq('team_id', gameData.team_id)
+        .order('jersey_number');
+      setPlayers(teamPlayers ?? []);
+
+      // Fetch previous pitch data for rest day eligibility
+      if (teamPlayers && gameData.game_date) {
+        const playerIds = teamPlayers.map((p: Player) => p.id);
+        const { data: prevPitches } = await supabase
+          .from('pitch_counts')
+          .select('player_id, count, game_id, games(game_date)')
+          .in('player_id', playerIds)
+          .neq('game_id', gameId)
+          .gt('count', 0);
+
+        if (prevPitches) {
+          const infoMap: Record<string, PrevPitchInfo> = {};
+          for (const playerId of playerIds) {
+            const playerPrevGames = (prevPitches as unknown as Array<{
+              player_id: string;
+              count: number;
+              game_id: string;
+              games: { game_date: string };
+            }>)
+              .filter(p => p.player_id === playerId)
+              .sort((a, b) => new Date(b.games.game_date).getTime() - new Date(a.games.game_date).getTime());
+
+            if (playerPrevGames.length > 0) {
+              const last = playerPrevGames[0];
+              const daysRequired = getRestDaysRequired(last.count);
+              const daysAvailable = daysBetween(last.games.game_date, gameData.game_date);
+              infoMap[playerId] = {
+                lastCount: last.count,
+                lastDate: last.games.game_date,
+                daysRequired,
+                daysAvailable,
+                eligible: daysAvailable >= daysRequired,
+              };
+            }
+          }
+          setPrevPitchInfo(infoMap);
+        }
+      }
+    }
   };
 
-  const logAtBat = async () => {
+  const openNewAtBatForm = () => {
+    setEditingAtBat(null);
+    setSelectedPlayer('');
+    setInning(1);
+    setResult('');
+    setRbi(0);
+    setRunScored(false);
+    setStolenBase(false);
+    setShowAtBatForm(true);
+  };
+
+  const openEditAtBatForm = (ab: AtBat) => {
+    setEditingAtBat(ab);
+    setSelectedPlayer(ab.player_id);
+    setInning(ab.inning);
+    setResult(ab.result);
+    setRbi(ab.rbi);
+    setRunScored(ab.run_scored);
+    setStolenBase(ab.stolen_base);
+    setShowAtBatForm(true);
+  };
+
+  const saveAtBat = async () => {
     if (!selectedPlayer || !result) return;
-    await supabase.from('at_bats').insert({
-      game_id: gameId,
+    const payload = {
       player_id: selectedPlayer,
       inning,
       result,
       rbi,
       run_scored: runScored,
       stolen_base: stolenBase,
-    });
-    setResult('');
-    setRbi(0);
-    setRunScored(false);
-    setStolenBase(false);
+    };
+    if (editingAtBat) {
+      await supabase.from('at_bats').update(payload).eq('id', editingAtBat.id);
+    } else {
+      await supabase.from('at_bats').insert({ game_id: gameId, ...payload });
+    }
     setShowAtBatForm(false);
+    setEditingAtBat(null);
     fetchAll();
+  };
+
+  const addPitcher = async (playerId: string) => {
+    const existing = pitchCounts.find(p => p.player_id === playerId);
+    if (!existing) {
+      await supabase.from('pitch_counts').insert({ game_id: gameId, player_id: playerId, count: 0 });
+      fetchAll();
+    }
+    setShowAddPitcher(false);
   };
 
   const addPitch = async (playerId: string) => {
@@ -94,15 +203,21 @@ export default function Game() {
   const playerStats = players.map(player => {
     const pAtBats = atBats.filter(ab => ab.player_id === player.id);
     const hits = pAtBats.filter(ab => ['single', 'double', 'triple', 'hr'].includes(ab.result)).length;
-    const abs = pAtBats.filter(ab => !['walk'].includes(ab.result)).length;
+    const abs = pAtBats.filter(ab => ab.result !== 'walk').length;
     const walks = pAtBats.filter(ab => ab.result === 'walk').length;
     const ks = pAtBats.filter(ab => ab.result === 'strikeout').length;
     const runs = pAtBats.filter(ab => ab.run_scored).length;
     const rbis = pAtBats.reduce((sum, ab) => sum + ab.rbi, 0);
     const sbs = pAtBats.filter(ab => ab.stolen_base).length;
     const avg = abs > 0 ? (hits / abs).toFixed(3).replace('0.', '.') : '---';
-    return { player, pAtBats, hits, abs, walks, ks, runs, rbis, sbs, avg };
+    return { player, hits, abs, walks, ks, runs, rbis, sbs, avg };
   });
+
+  // Only players with a pitch_count record for this game
+  const gamePitchers = players.filter(p => pitchCounts.some(pc => pc.player_id === p.id));
+  const unpitchedPlayers = players.filter(p => !pitchCounts.some(pc => pc.player_id === p.id));
+
+  const atBatFormTitle = editingAtBat ? 'Edit At-Bat' : 'Log At-Bat';
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -161,7 +276,7 @@ export default function Game() {
         {tab === 'atbats' && (
           <>
             <button
-              onClick={() => setShowAtBatForm(true)}
+              onClick={openNewAtBatForm}
               className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl text-sm font-medium mb-4 transition-colors"
             >
               + Log At-Bat
@@ -169,7 +284,7 @@ export default function Game() {
 
             {showAtBatForm && (
               <div className="bg-slate-900 border border-blue-900 rounded-2xl p-4 mb-4">
-                <h3 className="font-semibold mb-3 text-amber-400">Log At-Bat</h3>
+                <h3 className="font-semibold mb-3 text-amber-400">{atBatFormTitle}</h3>
 
                 <select
                   value={selectedPlayer}
@@ -199,7 +314,7 @@ export default function Game() {
                   {Object.entries(RESULT_LABELS).map(([key, { label, color }]) => (
                     <button
                       key={key}
-                      onClick={() => setResult(key)}
+                      onClick={() => setResult(key as ResultKey)}
                       className={`py-2 rounded-xl text-sm font-bold transition-colors ${result === key ? color + ' text-white ring-2 ring-amber-400' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
                     >
                       {label}
@@ -227,31 +342,37 @@ export default function Game() {
                   </label>
                   <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
                     <input type="checkbox" checked={stolenBase} onChange={e => setStolenBase(e.target.checked)} className="w-4 h-4 rounded accent-amber-500" />
-                    Stolen Base
+                    Stole 3rd
                   </label>
                 </div>
 
                 <div className="flex gap-2">
-                  <button onClick={logAtBat} disabled={!selectedPlayer || !result} className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white py-2 rounded-xl text-sm font-medium transition-colors">Save</button>
-                  <button onClick={() => setShowAtBatForm(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl text-sm font-medium transition-colors">Cancel</button>
+                  <button onClick={saveAtBat} disabled={!selectedPlayer || !result} className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white py-2 rounded-xl text-sm font-medium transition-colors">Save</button>
+                  <button onClick={() => { setShowAtBatForm(false); setEditingAtBat(null); }} className="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl text-sm font-medium transition-colors">Cancel</button>
                 </div>
               </div>
             )}
 
             <div className="space-y-2">
-              {[...atBats].reverse().slice(0, 15).map(ab => {
+              {[...atBats].reverse().slice(0, 20).map(ab => {
                 const player = players.find(p => p.id === ab.player_id);
                 const { label, color } = RESULT_LABELS[ab.result] ?? { label: ab.result, color: 'bg-slate-600' };
                 return (
                   <div key={ab.id} className="bg-slate-900 border border-blue-900 rounded-xl px-3 py-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`${color} text-white text-xs font-bold px-2 py-0.5 rounded-lg`}>{label}</span>
                       <span className="text-sm">{player?.name}</span>
                       {ab.rbi > 0 && <span className="text-xs text-amber-400">{ab.rbi} RBI</span>}
                       {ab.run_scored && <span className="text-xs text-green-400">R</span>}
                       {ab.stolen_base && <span className="text-xs text-sky-300">SB</span>}
+                      <span className="text-xs text-slate-500">Inn. {ab.inning}</span>
                     </div>
-                    <span className="text-xs text-slate-500">Inn. {ab.inning}</span>
+                    <button
+                      onClick={() => openEditAtBatForm(ab)}
+                      className="text-slate-500 hover:text-amber-400 text-xs px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors ml-1 flex-shrink-0"
+                    >
+                      Edit
+                    </button>
                   </div>
                 );
               })}
@@ -265,39 +386,84 @@ export default function Game() {
             <div className="bg-slate-900 border border-blue-900 rounded-xl px-4 py-3 text-xs text-sky-300 space-y-1">
               <p className="font-semibold text-white mb-1">Ages 7–8 Rules</p>
               <p>⚾ Max 50 pitches/game · Max 1 inning/game (2 in playoffs)</p>
-              <p>😴 Rest: 21–35 pitches = 1 day · 36–50 = 2 days · 51–65 = 3 days · 66+ = 4 days</p>
+              <p>😴 Rest: 21–35 = 1 day · 36–50 = 2 days · 51–65 = 3 days · 66+ = 4 days</p>
               <p>🚫 No pitching back-to-back games</p>
             </div>
 
-            {players.map(player => {
+            {/* Add Pitcher */}
+            {unpitchedPlayers.length > 0 && (
+              <>
+                <button
+                  onClick={() => setShowAddPitcher(true)}
+                  className="w-full bg-blue-800 hover:bg-blue-700 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                >
+                  + Add Pitcher
+                </button>
+                {showAddPitcher && (
+                  <div className="bg-slate-900 border border-blue-900 rounded-2xl p-4">
+                    <p className="text-sm font-medium text-sky-300 mb-3">Select a pitcher to add:</p>
+                    <div className="space-y-2">
+                      {unpitchedPlayers.map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => addPitcher(p.id)}
+                          className="w-full text-left px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm transition-colors"
+                        >
+                          #{p.jersey_number} {p.name}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => setShowAddPitcher(false)} className="w-full mt-3 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl text-sm transition-colors">Cancel</button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {gamePitchers.length === 0 && (
+              <p className="text-slate-500 text-sm text-center py-6">No pitchers added yet. Tap "+ Add Pitcher" to get started.</p>
+            )}
+
+            {gamePitchers.map(player => {
               const pc = pitchCounts.find(p => p.player_id === player.id);
               const count = pc?.count ?? 0;
               const pct = Math.min((count / 50) * 100, 100);
               const barColor = count >= 45 ? 'bg-red-500' : count >= 35 ? 'bg-amber-500' : 'bg-sky-400';
-              const restDays = count >= 66 ? 4 : count >= 51 ? 3 : count >= 36 ? 2 : count >= 21 ? 1 : 0;
-              const restLabel = restDays > 0 ? `${restDays} day${restDays > 1 ? 's' : ''} rest required` : 'No rest required';
+              const restDays = getRestDaysRequired(count);
               const restColor = restDays >= 3 ? 'text-red-400' : restDays === 2 ? 'text-amber-400' : restDays === 1 ? 'text-yellow-300' : 'text-green-400';
+              const prev = prevPitchInfo[player.id];
+
               return (
                 <div key={player.id} className="bg-slate-900 border border-blue-900 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium">{player.name}</span>
                     <span className={`text-2xl font-bold ${count >= 45 ? 'text-red-400' : count >= 35 ? 'text-amber-400' : 'text-white'}`}>{count}</span>
                   </div>
+
+                  {/* Rest eligibility from previous game */}
+                  {prev && (
+                    <div className={`text-xs px-3 py-2 rounded-lg mb-2 ${prev.eligible ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-red-900/30 text-red-400 border border-red-800'}`}>
+                      {prev.eligible
+                        ? `✅ Eligible — last pitched ${prev.daysAvailable}d ago (${prev.lastCount} pitches, needed ${prev.daysRequired}d rest)`
+                        : `🚫 Not eligible — last pitched ${prev.daysAvailable}d ago (${prev.lastCount} pitches, needs ${prev.daysRequired}d rest)`
+                      }
+                    </div>
+                  )}
+
                   <div className="w-full bg-slate-800 rounded-full h-2 mb-2">
                     <div className={`${barColor} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
                   </div>
                   <div className="flex items-center justify-between mb-3">
                     <span className={`text-xs font-medium ${restColor}`}>
-                      {count > 0 ? `😴 ${restLabel}` : '—'}
+                      {count > 0 ? `😴 ${restDays > 0 ? `${restDays} day${restDays > 1 ? 's' : ''} rest after game` : 'No rest required'}` : '—'}
                     </span>
-                    <span className="text-xs text-slate-500">{50 - count > 0 ? `${50 - count} left` : 'Limit reached'}</span>
+                    <span className="text-xs text-slate-500">{count < 50 ? `${50 - count} pitches left` : 'Limit reached'}</span>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => removePitch(player.id)} className="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl text-sm font-medium transition-colors">− 1</button>
                     <button onClick={() => addPitch(player.id)} disabled={count >= 50} className="flex-1 bg-blue-800 hover:bg-blue-700 disabled:opacity-40 py-2 rounded-xl text-sm font-bold transition-colors">+ 1 Pitch</button>
                   </div>
                   {count >= 50 && <p className="text-red-400 text-xs mt-2 text-center font-semibold">🛑 Pitch limit reached!</p>}
-                  {count >= 45 && count < 50 && <p className="text-amber-400 text-xs mt-2 text-center">⚠️ Approaching limit — {50 - count} pitch{50 - count !== 1 ? 'es' : ''} left</p>}
+                  {count >= 45 && count < 50 && <p className="text-amber-400 text-xs mt-2 text-center">⚠️ {50 - count} pitch{50 - count !== 1 ? 'es' : ''} left</p>}
                 </div>
               );
             })}
