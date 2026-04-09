@@ -24,8 +24,8 @@ function getRestDaysRequired(pitches: number): number {
 }
 
 function daysBetween(dateA: string, dateB: string): number {
-  const a = new Date(dateA);
-  const b = new Date(dateB);
+  const a = new Date(dateA + 'T00:00:00');
+  const b = new Date(dateB + 'T00:00:00');
   return Math.round(Math.abs(b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
@@ -104,7 +104,7 @@ export default function Game() {
               games: { game_date: string };
             }>)
               .filter(p => p.player_id === playerId)
-              .sort((a, b) => new Date(b.games.game_date).getTime() - new Date(a.games.game_date).getTime());
+              .sort((a, b) => new Date(b.games.game_date + 'T00:00:00').getTime() - new Date(a.games.game_date + 'T00:00:00').getTime());
 
             if (playerPrevGames.length > 0) {
               const last = playerPrevGames[0];
@@ -228,7 +228,7 @@ export default function Game() {
             <Link to={`/team/${game?.team_id}`} className="text-sky-300 hover:text-white text-2xl">‹</Link>
             <div className="flex-1">
               <p className="font-bold text-lg">vs. {game?.opponent}</p>
-              <p className="text-sky-300 text-xs">{game?.game_date ? new Date(game.game_date).toLocaleDateString() : ''}</p>
+              <p className="text-sky-300 text-xs">{game?.game_date ? new Date(game.game_date + 'T00:00:00').toLocaleDateString() : ''}</p>
             </div>
             <Link to={`/game/${gameId}/scorecard`} className="bg-blue-800 hover:bg-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
               🖨 Print

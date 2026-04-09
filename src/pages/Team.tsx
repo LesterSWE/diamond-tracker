@@ -185,7 +185,7 @@ export default function Team() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">vs. {game.opponent}</p>
-                        <p className="text-sm text-sky-300">{new Date(game.game_date).toLocaleDateString()}</p>
+                        <p className="text-sm text-sky-300">{new Date(game.game_date + 'T00:00:00').toLocaleDateString()}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-lg text-amber-400">{game.home_score} – {game.away_score}</p>
