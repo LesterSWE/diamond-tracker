@@ -1,0 +1,36 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    - cron: '0 9 * * 1,4'  # Every Monday & Thursday at 9am UTC
+  workflow_dispatch:        # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Little League Tracker
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "https://qgmlkncvwziotpklgixk.supabase.co/rest/v1/teams?limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY_LLT }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY_LLT }}")
+          echo "Little League Tracker response: $response"
+          if [ "$response" != "200" ]; then
+            echo "ERROR: Expected 200, got $response"
+            exit 1
+          fi
+          echo "Little League Tracker ping successful!"
+
+      - name: Ping Diamond Tracker Demo
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "https://kzvgdzwnycsjpwzuprie.supabase.co/rest/v1/teams?limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY_DEMO }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY_DEMO }}")
+          echo "Diamond Tracker Demo response: $response"
+          if [ "$response" != "200" ]; then
+            echo "ERROR: Expected 200, got $response"
+            exit 1
+          fi
+          echo "Diamond Tracker Demo ping successful!"
